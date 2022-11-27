@@ -31,5 +31,6 @@ case ${ACTION} in
     REMOTE_TO_REMOTE)
         logInfoMessage "Have to do copy operation from remote system to remote"
     ;;
+esac
 
 saveTaskStatus ${TASK_STATUS} ${ACTIVITY_SUB_TASK_CODE}
