@@ -21,6 +21,15 @@ logInfoMessage "I'll perform [action: ${ACTION}]"
 logInfoMessage "Received below arguments"
 logInfoMessage "Action to be performed: ${ACTION}"
 
-ssh ${HOST} "sudo systemctl $ACTION ${PROCESS}"
+case ${ACTION} in
+    LOCAL_TO_REMOTE)
+        logInfoMessage "Have to do copy operation from local system to remote"
+    ;;
+    REMOTE_TO_LOCAL)
+        logInfoMessage "Have to do copy operation from remote system to local"
+    ;;
+    REMOTE_TO_REMOTE)
+        logInfoMessage "Have to do copy operation from remote system to remote"
+    ;;
 
 saveTaskStatus ${TASK_STATUS} ${ACTIVITY_SUB_TASK_CODE}
