@@ -42,6 +42,7 @@ case ${ACTION} in
         logInfoMessage "Target server alias: ${TARGET_SERVER_ALIAS}"
         logInfoMessage "Target file path: ${TARGET_FILE_PATH}"
         logInfoMessage "Command to be executed: scp ${LOCAL_FILE_PATH} ${TARGET_SERVER_ALIAS}:${TARGET_FILE_PATH}"
+        scp ${LOCAL_FILE_PATH} ${TARGET_SERVER_ALIAS}:${TARGET_FILE_PATH}
     ;;
     REMOTE_TO_LOCAL)
         logInfoMessage "Have to do copy operation from remote system to local"
