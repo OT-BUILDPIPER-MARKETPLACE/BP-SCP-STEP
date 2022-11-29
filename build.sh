@@ -6,7 +6,11 @@ source /opt/buildpiper/shell-functions/str-functions.sh
 source /opt/buildpiper/shell-functions/file-functions.sh
 source /opt/buildpiper/shell-functions/aws-functions.sh
 
+CODEBASE_LOCATION="${WORKSPACE}"/"${CODEBASE_DIR}"
+logInfoMessage "I'll do processing at [$CODEBASE_LOCATION]"
 sleep  $SLEEP_DURATION
+
+cd  "${CODEBASE_LOCATION}"
 
 TASK_STATUS=0
 
@@ -42,7 +46,7 @@ case ${ACTION} in
         logInfoMessage "Target server alias: ${TARGET_SERVER_ALIAS}"
         logInfoMessage "Target file path: ${TARGET_FILE_PATH}"
         logInfoMessage "Command to be executed: scp ${LOCAL_FILE_PATH} ${TARGET_SERVER_ALIAS}:${TARGET_FILE_PATH}"
-        scp ${LOCAL_FILE_PATH} ${TARGET_SERVER_ALIAS}:${TARGET_FILE_PATH}
+        scp -v ${LOCAL_FILE_PATH} ${TARGET_SERVER_ALIAS}:${TARGET_FILE_PATH}
     ;;
     REMOTE_TO_LOCAL)
         logInfoMessage "Have to do copy operation from remote system to local"
