@@ -24,6 +24,27 @@ ensure_tools() {
     done
 }
 
+check_tools() {
+    local tools=("rsync" "scp" "ssh" "sshpass")
+    local missing=()
+    for t in "${tools[@]}"; do
+        if ! command -v "$t" >/dev/null 2>&1; then
+            missing+=("$t")
+        fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "❌ Missing required tools: ${missing[*]}"
+        echo "Please install them or rebuild the Docker image with them."
+        exit 1
+    fi
+
+    echo "✅ All required tools are installed: ${tools[*]}"
+}
+
+# Call it early
+check_tools
+
 # Run SSH command
 run_ssh() {
     local cmd="$1"
