@@ -6,14 +6,14 @@ FROM python:3.12-slim
 # -------------------------------
 # Install dependencies
 # -------------------------------
-# -------------------------------
-# Install dependencies
-# -------------------------------
 RUN apt-get update && apt-get install -y \
         jq \
         passwd \
         openssh-client \
+        rsync \
+        sshpass \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 
 # Install Python packages
 RUN pip install --no-cache-dir cryptography
