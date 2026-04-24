@@ -114,7 +114,10 @@ TASK_STATUS=0
 # Paths & SSH setup
 # --------------------------------------------------
 CODEBASE_LOCATION="${WORKSPACE}/${CODEBASE_DIR}"
-cd "$CODEBASE_LOCATION" || { echo "❌ Failed to change directory"; exit 1; }
+cd "${CODEBASE_LOCATION}" || { echo "❌ Failed to change directory"; exit 1; }
+add_event "DIRECTORY PROCESSING" "In Progress" \
+      "Processing directory" \
+      "Directory: ${CODEBASE_LOCATION}"
 
 KEY_FILE="key.pem"
 [[ "$AUTH_MODE" == "key" && -f "$KEY_FILE" ]] && chmod 400 "$KEY_FILE"
@@ -144,11 +147,17 @@ esac
 # Ensure tools
 # --------------------------------------------------
 ensure_tools
+add_event "TOOLS ENSURED" "Completed" \
+      "Required tools are installed" \
+      "Tools: rsync, ssh, scp, sshpass"
 
 # --------------------------------------------------
 # Connectivity check
 # --------------------------------------------------
 run_ssh "echo connected" || { echo "❌ SSH connection failed"; exit 1; }
+add_event "SSH CONNECTIVITY" "Success" \
+      "SSH connection established" \
+      "Host: ${SSH_HOST}"
 
 # --------------------------------------------------
 # Execute transfer
@@ -157,6 +166,9 @@ case "$TRANSFER_TOOL" in
     scp)   echo "📦 Using SCP transfer"; run_scp ;;
     rsync) echo "🚀 Using RSYNC transfer"; run_rsync ;;
     *) echo "❌ Invalid TRANSFER_TOOL"; exit 1 ;;
+add_event "TRANSFER EXECUTED" "Success" \
+      "File transfer completed" \
+      "Tool: ${TRANSFER_TOOL}"
 esac
 
 echo "✅ Deployment completed successfully"
