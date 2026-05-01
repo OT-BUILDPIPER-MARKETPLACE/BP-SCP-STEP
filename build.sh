@@ -37,16 +37,21 @@ check_tools() {
     done
 
     if [ ${#missing[@]} -gt 0 ]; then
-        echo "❌ Missing required tools: ${missing[*]}"
-        echo "Please install them or rebuild the Docker image with them."
+        logErrorMessage "Missing required tools: ${missing[*]}"
+        add_event "TOOL CHECK" "Failed" \
+              "Required tools are missing from the environment" \
+              "Missing: ${missing[*]}"
         exit 1
     fi
 
-    echo "✅ All required tools are installed: ${tools[*]}"
+    logInfoMessage "All required tools are installed: ${tools[*]}"
 }
 
 # Call it early
 check_tools
+add_event "TOOL CHECK" "Successful" \
+      "All required tools are available" \
+      "Tools: rsync, scp, ssh, sshpass"
 
 # Run SSH command
 run_ssh() {
@@ -114,6 +119,25 @@ DEBUG="${DEBUG:-false}"
 TASK_STATUS=0
 
 # --------------------------------------------------
+# Validate auth mode
+# --------------------------------------------------
+case "$AUTH_MODE" in
+    key|password|public_key)
+        logInfoMessage "Auth mode: ${AUTH_MODE}"
+        ;;
+    *)
+        logErrorMessage "Invalid AUTH_MODE: ${AUTH_MODE}. Allowed: key, password, public_key"
+        add_event "AUTH MODE VALIDATION" "Failed" \
+              "Invalid authentication mode specified" \
+              "AUTH_MODE: ${AUTH_MODE}. Allowed values: key, password, public_key"
+        exit 1
+        ;;
+esac
+add_event "AUTH MODE VALIDATION" "Successful" \
+      "Authentication mode is valid" \
+      "AUTH_MODE: ${AUTH_MODE}"
+
+# --------------------------------------------------
 # Validate required inputs
 # --------------------------------------------------
 VALIDATION_ERRORS=""
@@ -152,7 +176,23 @@ add_event "DIRECTORY PROCESSING" "Successful" \
       "Directory: ${CODEBASE_LOCATION}"
 
 KEY_FILE="key.pem"
-[[ "$AUTH_MODE" == "key" && -f "$KEY_FILE" ]] && chmod 400 "$KEY_FILE"
+if [[ "$AUTH_MODE" == "key" ]]; then
+    if [[ ! -f "$KEY_FILE" ]]; then
+        logErrorMessage "SSH key file not found: ${KEY_FILE}"
+        add_event "SSH KEY SETUP" "Failed" \
+              "SSH key file does not exist" \
+              "Key file: ${KEY_FILE} Auth mode: key"
+        exit 1
+    fi
+    chmod 400 "$KEY_FILE"
+    add_event "SSH KEY SETUP" "Successful" \
+          "SSH key file found and permissions set" \
+          "Key file: ${KEY_FILE}"
+else
+    add_event "SSH KEY SETUP" "Successful" \
+          "Key file not required for this auth mode" \
+          "AUTH_MODE: ${AUTH_MODE}"
+fi
 
 SSH_BASE_OPTS="-p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
@@ -160,7 +200,9 @@ SSH_BASE_OPTS="-p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=
 # Resolve source paths
 # --------------------------------------------------
 case "$SCP_SOURCE_MODE" in
-    codebase) SOURCES="${CODEBASE_LOCATION}/" ;;
+    codebase)
+        SOURCES="${CODEBASE_LOCATION}/"
+        ;;
     single)
         if [[ -z "$SCP_SINGLE_FILE" ]]; then
             logErrorMessage "SCP_SINGLE_FILE missing"
@@ -192,6 +234,9 @@ case "$SCP_SOURCE_MODE" in
         exit 1
         ;;
 esac
+add_event "SOURCE RESOLUTION" "Successful" \
+      "Source paths resolved successfully" \
+      "Mode: ${SCP_SOURCE_MODE} Sources: ${SOURCES}"
 
 # --------------------------------------------------
 # Ensure tools
