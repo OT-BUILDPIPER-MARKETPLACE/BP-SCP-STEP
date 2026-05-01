@@ -90,13 +90,13 @@ run_rsync() {
 # --------------------------------------------------
 # Defaults / Inputs
 # --------------------------------------------------
-WORKSPACE="${WORKSPACE:?WORKSPACE missing}"
-CODEBASE_DIR="${CODEBASE_DIR:?CODEBASE_DIR missing}"
+WORKSPACE="${WORKSPACE:-}"
+CODEBASE_DIR="${CODEBASE_DIR:-}"
 
-SSH_USER="${SSH_USER:?SSH_USER missing}"
-SSH_HOST="${SSH_HOST:?SSH_HOST missing}"
+SSH_USER="${SSH_USER:-}"
+SSH_HOST="${SSH_HOST:-}"
 SSH_PORT="${SSH_PORT:-22}"
-REMOTE_TARGET_PATH="${REMOTE_TARGET_PATH:?REMOTE_TARGET_PATH missing}"
+REMOTE_TARGET_PATH="${REMOTE_TARGET_PATH:-}"
 
 TRANSFER_TOOL="${TRANSFER_TOOL:-scp}"           # scp | rsync
 SCP_SOURCE_MODE="${SCP_SOURCE_MODE:-codebase}" # codebase | single | multiple
@@ -112,6 +112,29 @@ SSH_PASSWORD="${SSH_PASSWORD:-}"
 
 DEBUG="${DEBUG:-false}"
 TASK_STATUS=0
+
+# --------------------------------------------------
+# Validate required inputs
+# --------------------------------------------------
+VALIDATION_ERRORS=""
+[[ -z "$WORKSPACE" ]]           && VALIDATION_ERRORS+="WORKSPACE is not set. "
+[[ -z "$CODEBASE_DIR" ]]        && VALIDATION_ERRORS+="CODEBASE_DIR is not set. "
+[[ -z "$SSH_USER" ]]            && VALIDATION_ERRORS+="SSH_USER is not set. "
+[[ -z "$SSH_HOST" ]]            && VALIDATION_ERRORS+="SSH_HOST is not set. "
+[[ -z "$REMOTE_TARGET_PATH" ]]  && VALIDATION_ERRORS+="REMOTE_TARGET_PATH is not set. "
+
+if [[ -n "$VALIDATION_ERRORS" ]]; then
+    logErrorMessage "Missing required variables: $VALIDATION_ERRORS"
+    add_event "INPUT VALIDATION" "Failed" \
+          "Required environment variables are missing" \
+          "$VALIDATION_ERRORS"
+    exit 1
+fi
+
+add_event "INPUT VALIDATION" "Successful" \
+      "All required input variables are set" \
+      "WORKSPACE: ${WORKSPACE} SSH_HOST: ${SSH_HOST}"
+
 
 # --------------------------------------------------
 # Paths & SSH setup
