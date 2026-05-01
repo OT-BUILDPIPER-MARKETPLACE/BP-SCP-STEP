@@ -1,6 +1,9 @@
 #!/bin/bash
-set -euo pipefail
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+set -e
+# Enable debug mode if DEBUG=true is set
+if [ "$DEBUG" = "true" ]; then
+    set -x
+fi
 
 # --------------------------------------------------
 # Load shell functions
@@ -114,9 +117,15 @@ TASK_STATUS=0
 # Paths & SSH setup
 # --------------------------------------------------
 CODEBASE_LOCATION="${WORKSPACE}/${CODEBASE_DIR}"
-cd "${CODEBASE_LOCATION}" || { echo "❌ Failed to change directory"; exit 1; }
-add_event "DIRECTORY PROCESSING" "In Progress" \
-      "Processing directory" \
+cd "${CODEBASE_LOCATION}" || {
+    logErrorMessage "Failed to change directory to ${CODEBASE_LOCATION}"
+    add_event "DIRECTORY PROCESSING" "Failed" \
+          "Failed to change directory" \
+          "Directory: ${CODEBASE_LOCATION}"
+    exit 1
+}
+add_event "DIRECTORY PROCESSING" "Successful" \
+      "Changed to codebase directory" \
       "Directory: ${CODEBASE_LOCATION}"
 
 KEY_FILE="key.pem"
@@ -130,32 +139,56 @@ SSH_BASE_OPTS="-p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=
 case "$SCP_SOURCE_MODE" in
     codebase) SOURCES="${CODEBASE_LOCATION}/" ;;
     single)
-        [[ -z "$SCP_SINGLE_FILE" ]] && { echo "SCP_SINGLE_FILE missing"; exit 1; }
+        if [[ -z "$SCP_SINGLE_FILE" ]]; then
+            logErrorMessage "SCP_SINGLE_FILE missing"
+            add_event "SOURCE RESOLUTION" "Failed" \
+                  "SCP_SINGLE_FILE variable is not set" \
+                  "Mode: single"
+            exit 1
+        fi
         SOURCES="${CODEBASE_LOCATION}/${SCP_SINGLE_FILE}"
         ;;
     multiple)
-        [[ -z "$SCP_MULTIPLE_FILES" ]] && { echo "SCP_MULTIPLE_FILES missing"; exit 1; }
+        if [[ -z "$SCP_MULTIPLE_FILES" ]]; then
+            logErrorMessage "SCP_MULTIPLE_FILES missing"
+            add_event "SOURCE RESOLUTION" "Failed" \
+                  "SCP_MULTIPLE_FILES variable is not set" \
+                  "Mode: multiple"
+            exit 1
+        fi
         SOURCES=""
         for f in $SCP_MULTIPLE_FILES; do
             SOURCES+=" ${CODEBASE_LOCATION}/${f}"
         done
         ;;
-    *) echo "Invalid SCP_SOURCE_MODE"; exit 1 ;;
+    *)
+        logErrorMessage "Invalid SCP_SOURCE_MODE: ${SCP_SOURCE_MODE}"
+        add_event "SOURCE RESOLUTION" "Failed" \
+              "Invalid SCP_SOURCE_MODE" \
+              "Mode: ${SCP_SOURCE_MODE}"
+        exit 1
+        ;;
 esac
 
 # --------------------------------------------------
 # Ensure tools
 # --------------------------------------------------
 ensure_tools
-add_event "TOOLS ENSURED" "Completed" \
+add_event "TOOLS ENSURED" "Successful" \
       "Required tools are installed" \
       "Tools: rsync, ssh, scp, sshpass"
 
 # --------------------------------------------------
 # Connectivity check
 # --------------------------------------------------
-run_ssh "echo connected" || { echo "❌ SSH connection failed"; exit 1; }
-add_event "SSH CONNECTIVITY" "Success" \
+if ! run_ssh "echo connected"; then
+    logErrorMessage "SSH connection failed to ${SSH_HOST}"
+    add_event "SSH CONNECTIVITY" "Failed" \
+          "SSH connection could not be established" \
+          "Host: ${SSH_HOST}"
+    exit 1
+fi
+add_event "SSH CONNECTIVITY" "Successful" \
       "SSH connection established" \
       "Host: ${SSH_HOST}"
 
@@ -163,12 +196,35 @@ add_event "SSH CONNECTIVITY" "Success" \
 # Execute transfer
 # --------------------------------------------------
 case "$TRANSFER_TOOL" in
-    scp)   echo "📦 Using SCP transfer"; run_scp ;;
-    rsync) echo "🚀 Using RSYNC transfer"; run_rsync ;;
-    *) echo "❌ Invalid TRANSFER_TOOL"; exit 1 ;;
-add_event "TRANSFER EXECUTED" "Success" \
-      "File transfer completed" \
-      "Tool: ${TRANSFER_TOOL}"
+    scp)
+        logInfoMessage "Using SCP transfer"
+        if ! run_scp; then
+            add_event "TRANSFER EXECUTED" "Failed" \
+                  "SCP file transfer failed" \
+                  "Tool: scp Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+            exit 1
+        fi
+        ;;
+    rsync)
+        logInfoMessage "Using RSYNC transfer"
+        if ! run_rsync; then
+            add_event "TRANSFER EXECUTED" "Failed" \
+                  "RSYNC file transfer failed" \
+                  "Tool: rsync Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+            exit 1
+        fi
+        ;;
+    *)
+        logErrorMessage "Invalid TRANSFER_TOOL: ${TRANSFER_TOOL}"
+        add_event "TRANSFER EXECUTED" "Failed" \
+              "Invalid TRANSFER_TOOL specified" \
+              "Tool: ${TRANSFER_TOOL}"
+        exit 1
+        ;;
 esac
 
-echo "✅ Deployment completed successfully"
+add_event "TRANSFER EXECUTED" "Successful" \
+      "File transfer completed successfully" \
+      "Tool: ${TRANSFER_TOOL} Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+
+logInfoMessage "Deployment completed successfully"

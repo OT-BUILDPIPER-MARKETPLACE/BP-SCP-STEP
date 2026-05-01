@@ -11,8 +11,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     SHELL_FUNCTIONS_PATH="/opt/buildpiper/shell-functions" \
     SSH_OPTIONS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
     SLEEP_DURATION=5s \
-    ACTIVITY_SUB_TASK_CODE="SCP_REMOTE_PROCESS" \
     VALIDATION_FAILURE_ACTION="FAILURE"
+# ACTIVITY_SUB_TASK_CODE is intentionally NOT set here.
+# BuildPiper injects the correct value at runtime so that add_event
+# writes events to the path the UI expects to read from.
 
 # -------------------------------
 # Install system dependencies
