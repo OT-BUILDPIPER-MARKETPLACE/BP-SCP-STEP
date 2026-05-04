@@ -134,13 +134,13 @@ case "$AUTH_MODE" in
         ;;
     *)
         logErrorMessage "Invalid AUTH_MODE: ${AUTH_MODE}. Allowed: key, password, public_key"
-        add_event "CONFIGURATION VALIDATION" "Failed" \
+        add_event "AUTH MODE VALIDATION" "Failed" \
               "Invalid authentication mode specified" \
               "AUTH_MODE: ${AUTH_MODE} is not supported. Use: key, password, or public_key"
         exit 1
         ;;
 esac
-add_event "CONFIGURATION VALIDATION" "Successful" \
+add_event "AUTH MODE VALIDATION" "Successful" \
       "Authentication mode is valid" \
       "AUTH_MODE: ${AUTH_MODE}"
 
@@ -156,13 +156,13 @@ VALIDATION_ERRORS=""
 
 if [[ -n "$VALIDATION_ERRORS" ]]; then
     logErrorMessage "Missing required variables: $VALIDATION_ERRORS"
-    add_event "CONFIGURATION VALIDATION" "Failed" \
+    add_event "INPUT VARIABLE VALIDATION" "Failed" \
           "Required environment variables are missing" \
           "Please provide: $VALIDATION_ERRORS"
     exit 1
 fi
 
-add_event "CONFIGURATION VALIDATION" "Successful" \
+add_event "INPUT VARIABLE VALIDATION" "Successful" \
       "All required input variables are verified" \
       "Target Host: ${SSH_HOST}, Port: ${SSH_PORT}"
 
