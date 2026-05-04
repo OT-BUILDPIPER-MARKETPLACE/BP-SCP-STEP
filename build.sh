@@ -155,10 +155,11 @@ VALIDATION_ERRORS=""
 [[ -z "$REMOTE_TARGET_PATH" ]]  && VALIDATION_ERRORS+="REMOTE_TARGET_PATH is not set. "
 
 if [[ -n "$VALIDATION_ERRORS" ]]; then
-    logErrorMessage "Missing required variables: $VALIDATION_ERRORS"
+    
     add_event "INPUT VARIABLE VALIDATION" "Failed" \
           "Required environment variables are missing" \
           "Please provide: $VALIDATION_ERRORS"
+    logErrorMessage "Missing required variables: $VALIDATION_ERRORS"
     exit 1
 fi
 
