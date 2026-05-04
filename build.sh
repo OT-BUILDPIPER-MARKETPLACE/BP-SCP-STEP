@@ -16,6 +16,13 @@ source "$SHELL_FUNCTIONS_PATH/str-functions.sh"
 source "$SHELL_FUNCTIONS_PATH/file-functions.sh"
 source "$SHELL_FUNCTIONS_PATH/aws-functions.sh"
 
+# --------------------------------------------------
+# Signal step startup
+# --------------------------------------------------
+add_event "STEP STARTUP" "Successful" \
+      "SCP transfer step has initiated" \
+      "Initializing environment and validating configuration..."
+
 # Install missing tools
 ensure_tools() {
     local tools=("rsync" "ssh" "scp" "sshpass")
@@ -38,9 +45,9 @@ check_tools() {
 
     if [ ${#missing[@]} -gt 0 ]; then
         logErrorMessage "Missing required tools: ${missing[*]}"
-        add_event "TOOL CHECK" "Failed" \
-              "Required tools are missing from the environment" \
-              "Missing: ${missing[*]}"
+        add_event "ENVIRONMENT VERIFICATION" "Failed" \
+              "One or more required tools are missing" \
+              "Please ensure the following are installed: ${missing[*]}"
         exit 1
     fi
 
@@ -49,8 +56,8 @@ check_tools() {
 
 # Call it early
 check_tools
-add_event "TOOL CHECK" "Successful" \
-      "All required tools are available" \
+add_event "ENVIRONMENT VERIFICATION" "Successful" \
+      "All required tools are available in the environment" \
       "Tools: rsync, scp, ssh, sshpass"
 
 # Run SSH command
@@ -127,13 +134,13 @@ case "$AUTH_MODE" in
         ;;
     *)
         logErrorMessage "Invalid AUTH_MODE: ${AUTH_MODE}. Allowed: key, password, public_key"
-        add_event "AUTH MODE VALIDATION" "Failed" \
+        add_event "CONFIGURATION VALIDATION" "Failed" \
               "Invalid authentication mode specified" \
-              "AUTH_MODE: ${AUTH_MODE}. Allowed values: key, password, public_key"
+              "AUTH_MODE: ${AUTH_MODE} is not supported. Use: key, password, or public_key"
         exit 1
         ;;
 esac
-add_event "AUTH MODE VALIDATION" "Successful" \
+add_event "CONFIGURATION VALIDATION" "Successful" \
       "Authentication mode is valid" \
       "AUTH_MODE: ${AUTH_MODE}"
 
@@ -149,15 +156,15 @@ VALIDATION_ERRORS=""
 
 if [[ -n "$VALIDATION_ERRORS" ]]; then
     logErrorMessage "Missing required variables: $VALIDATION_ERRORS"
-    add_event "INPUT VALIDATION" "Failed" \
+    add_event "CONFIGURATION VALIDATION" "Failed" \
           "Required environment variables are missing" \
-          "$VALIDATION_ERRORS"
+          "Please provide: $VALIDATION_ERRORS"
     exit 1
 fi
 
-add_event "INPUT VALIDATION" "Successful" \
-      "All required input variables are set" \
-      "WORKSPACE: ${WORKSPACE} SSH_HOST: ${SSH_HOST}"
+add_event "CONFIGURATION VALIDATION" "Successful" \
+      "All required input variables are verified" \
+      "Target Host: ${SSH_HOST}, Port: ${SSH_PORT}"
 
 
 # --------------------------------------------------
@@ -166,13 +173,13 @@ add_event "INPUT VALIDATION" "Successful" \
 CODEBASE_LOCATION="${WORKSPACE}/${CODEBASE_DIR}"
 cd "${CODEBASE_LOCATION}" || {
     logErrorMessage "Failed to change directory to ${CODEBASE_LOCATION}"
-    add_event "DIRECTORY PROCESSING" "Failed" \
-          "Failed to change directory" \
-          "Directory: ${CODEBASE_LOCATION}"
+    add_event "WORKSPACE VERIFICATION" "Failed" \
+          "Failed to access codebase directory" \
+          "Directory: ${CODEBASE_LOCATION}. Please verify WORKSPACE and CODEBASE_DIR variables."
     exit 1
 }
-add_event "DIRECTORY PROCESSING" "Successful" \
-      "Changed to codebase directory" \
+add_event "WORKSPACE VERIFICATION" "Successful" \
+      "Codebase directory accessed successfully" \
       "Directory: ${CODEBASE_LOCATION}"
 
 KEY_FILE="key.pem"
@@ -180,18 +187,18 @@ if [[ "$AUTH_MODE" == "key" ]]; then
     if [[ ! -f "$KEY_FILE" ]]; then
         logErrorMessage "SSH key file not found: ${KEY_FILE}"
         add_event "SSH KEY SETUP" "Failed" \
-              "SSH key file does not exist" \
-              "Key file: ${KEY_FILE} Auth mode: key"
+              "SSH key file is missing" \
+              "The file '${KEY_FILE}' was not found in the codebase. This is required for 'key' auth mode."
         exit 1
     fi
     chmod 400 "$KEY_FILE"
     add_event "SSH KEY SETUP" "Successful" \
-          "SSH key file found and permissions set" \
+          "SSH key file verified and permissions set" \
           "Key file: ${KEY_FILE}"
 else
     add_event "SSH KEY SETUP" "Successful" \
-          "Key file not required for this auth mode" \
-          "AUTH_MODE: ${AUTH_MODE}"
+          "Key file skip: Not required for ${AUTH_MODE} mode" \
+          "Auth Mode: ${AUTH_MODE}"
 fi
 
 SSH_BASE_OPTS="-p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -228,22 +235,22 @@ case "$SCP_SOURCE_MODE" in
         ;;
     *)
         logErrorMessage "Invalid SCP_SOURCE_MODE: ${SCP_SOURCE_MODE}"
-        add_event "SOURCE RESOLUTION" "Failed" \
-              "Invalid SCP_SOURCE_MODE" \
-              "Mode: ${SCP_SOURCE_MODE}"
+        add_event "SOURCE PATH RESOLUTION" "Failed" \
+              "Invalid source mode specified" \
+              "Mode: ${SCP_SOURCE_MODE}. Supported: codebase, single, multiple"
         exit 1
         ;;
 esac
-add_event "SOURCE RESOLUTION" "Successful" \
+add_event "SOURCE PATH RESOLUTION" "Successful" \
       "Source paths resolved successfully" \
-      "Mode: ${SCP_SOURCE_MODE} Sources: ${SOURCES}"
+      "Mode: ${SCP_SOURCE_MODE}, Sources: ${SOURCES}"
 
 # --------------------------------------------------
-# Ensure tools
+# Tools verification (Final check)
 # --------------------------------------------------
 ensure_tools
-add_event "TOOLS ENSURED" "Successful" \
-      "Required tools are installed" \
+add_event "ENVIRONMENT VERIFICATION" "Successful" \
+      "Required tools are confirmed installed" \
       "Tools: rsync, ssh, scp, sshpass"
 
 # --------------------------------------------------
@@ -253,12 +260,27 @@ if ! run_ssh "echo connected"; then
     logErrorMessage "SSH connection failed to ${SSH_HOST}"
     add_event "SSH CONNECTIVITY" "Failed" \
           "SSH connection could not be established" \
-          "Host: ${SSH_HOST}"
+          "Host: ${SSH_HOST}. Please verify host, port, and credentials."
     exit 1
 fi
 add_event "SSH CONNECTIVITY" "Successful" \
-      "SSH connection established" \
-      "Host: ${SSH_HOST}"
+      "SSH connection established with remote host" \
+      "Host: ${SSH_HOST}, Port: ${SSH_PORT}"
+
+# --------------------------------------------------
+# Remote target preparation
+# --------------------------------------------------
+logInfoMessage "Ensuring remote target directory exists: ${REMOTE_TARGET_PATH}"
+if ! run_ssh "mkdir -p ${REMOTE_TARGET_PATH}"; then
+    logErrorMessage "Failed to create remote directory: ${REMOTE_TARGET_PATH}"
+    add_event "REMOTE TARGET PREPARATION" "Failed" \
+          "Could not ensure remote directory existence" \
+          "Target Path: ${REMOTE_TARGET_PATH}"
+    exit 1
+fi
+add_event "REMOTE TARGET PREPARATION" "Successful" \
+      "Remote target directory is ready" \
+      "Path: ${REMOTE_TARGET_PATH}"
 
 # --------------------------------------------------
 # Execute transfer
@@ -267,32 +289,39 @@ case "$TRANSFER_TOOL" in
     scp)
         logInfoMessage "Using SCP transfer"
         if ! run_scp; then
-            add_event "TRANSFER EXECUTED" "Failed" \
+            add_event "DATA TRANSFER" "Failed" \
                   "SCP file transfer failed" \
-                  "Tool: scp Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+                  "Tool: scp, Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
             exit 1
         fi
         ;;
     rsync)
         logInfoMessage "Using RSYNC transfer"
         if ! run_rsync; then
-            add_event "TRANSFER EXECUTED" "Failed" \
+            add_event "DATA TRANSFER" "Failed" \
                   "RSYNC file transfer failed" \
-                  "Tool: rsync Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+                  "Tool: rsync, Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
             exit 1
         fi
         ;;
     *)
         logErrorMessage "Invalid TRANSFER_TOOL: ${TRANSFER_TOOL}"
-        add_event "TRANSFER EXECUTED" "Failed" \
+        add_event "DATA TRANSFER" "Failed" \
               "Invalid TRANSFER_TOOL specified" \
               "Tool: ${TRANSFER_TOOL}"
         exit 1
         ;;
 esac
 
-add_event "TRANSFER EXECUTED" "Successful" \
+add_event "DATA TRANSFER" "Successful" \
       "File transfer completed successfully" \
-      "Tool: ${TRANSFER_TOOL} Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+      "Tool: ${TRANSFER_TOOL}, Target: ${SSH_HOST}:${REMOTE_TARGET_PATH}"
+
+# --------------------------------------------------
+# Final status
+# --------------------------------------------------
+add_event "STEP COMPLETION" "Successful" \
+      "All tasks completed successfully" \
+      "Step: SCP Transfer, Host: ${SSH_HOST}"
 
 logInfoMessage "Deployment completed successfully"
